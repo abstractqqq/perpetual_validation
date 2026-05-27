@@ -11,6 +11,19 @@ The benchmarks use a rigorous evaluation pipeline focusing on both ranking power
 3.  **Metrics**: **ROC AUC** (ranking) and **LogLoss** (calibration).
 4.  **Data Splits**: Evaluation is performed across **Train**, **Random Test**, and **Out-of-Sample (OOS)** sets to measure generalization and robustness to temporal shifts.
 
+## Visualizations
+
+### 1. Efficiency Frontier: Time vs. ROC AUC
+This plot highlights the massive speedup of Perpetual (log scale) while maintaining or exceeding the ranking power of a tuned LightGBM.
+
+![Time vs ROC AUC](calibrated_time_vs_auc.png)
+
+### 2. Metric Comparisons across Splits
+Detailed breakdown of ranking (ROC AUC) and calibration (LogLoss) across Train, Test, and Out-of-Sample sets.
+
+![ROC AUC Comparison](calibrated_roc_auc_comparison.png)
+![LogLoss Comparison](calibrated_logloss_comparison.png)
+
 ## Final Results
 
 ### 1. Electricity (Temporal OOS)

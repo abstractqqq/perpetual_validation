@@ -30,16 +30,13 @@ class SimpleCalibrator:
     def fit(self, X, y):
         X_arr = np.array(X)
         y_arr = np.array(y)
-        kf = KFold(
-            n_splits=self.cv, shuffle=False
-        )  # Keep temporal order if needed, or shuffle
+        kf = KFold(n_splits=self.cv, shuffle=False)
 
         self.calibrators = []
         for train_idx, val_idx in kf.split(X_arr):
             X_t, X_v = X_arr[train_idx], X_arr[val_idx]
             y_t, y_v = y_arr[train_idx], y_arr[val_idx]
 
-            # Fit base model
             if self.base_model_type == "perpetual":
                 model = PerpetualBooster(objective="LogLoss")
                 model.fit(X_t, y_t)
@@ -47,13 +44,11 @@ class SimpleCalibrator:
                 dtrain = lgb.Dataset(X_t, label=y_t)
                 model = lgb.train(self.params, dtrain)
 
-            # Get raw probs on validation set
             if self.base_model_type == "perpetual":
                 raw_probs = model.predict_proba(X_v)[:, 1]
             else:
                 raw_probs = model.predict(X_v)
 
-            # Simple sigmoid calibration: fit a logistic regression on raw_probs -> y_v
             from sklearn.linear_model import LogisticRegression
 
             lr = LogisticRegression(penalty=None)
@@ -73,7 +68,6 @@ class SimpleCalibrator:
             calibrated = lr.predict_proba(raw.reshape(-1, 1))[:, 1]
             all_probs.append(calibrated)
 
-        # Ensemble average
         mean_prob = np.mean(all_probs, axis=0)
         return np.vstack([1 - mean_prob, mean_prob]).T
 
@@ -106,7 +100,6 @@ def run_calibrated_benchmark(X, y, name, has_oos=False):
 
     results = {}
 
-    # 1. Calibrated Perpetual
     print("Training Calibrated Perpetual...")
     start_p = time.time()
     cal_p = SimpleCalibrator("perpetual", cv=3)
@@ -119,7 +112,6 @@ def run_calibrated_benchmark(X, y, name, has_oos=False):
     res_p["Time (s)"] = p_time
     results["Calibrated Perpetual"] = res_p
 
-    # 2. LightGBM + Optuna
     print(f"Tuning LightGBM with Optuna ({N_TRIALS} trials)...")
 
     def objective(trial):
@@ -214,6 +206,33 @@ def main():
         sns.barplot(data=df_melt, x="Dataset", y="Value", hue="Model", palette="muted")
         plt.title(f"{metric} Comparison: Train vs Test vs OOS (Manual Calibration)")
         plt.savefig(f"calibrated_{metric.lower().replace(' ', '_')}_comparison.png")
+
+    # Time vs ROC AUC Visualization
+    plt.figure(figsize=(12, 6))
+    ax = sns.scatterplot(
+        data=df_summary,
+        x="Time (s)",
+        y="OOS ROC AUC",
+        hue="Model",
+        style="Dataset",
+        s=200,
+        palette="Set1",
+    )
+    plt.xscale("log")
+    plt.title("Efficiency Frontier: Training Time (Log Scale) vs. OOS ROC AUC")
+    plt.grid(True, which="both", ls="-", alpha=0.2)
+
+    for i in range(df_summary.shape[0]):
+        plt.text(
+            df_summary["Time (s)"][i] * 1.1,
+            df_summary["OOS ROC AUC"][i],
+            f"{df_summary['Dataset'][i]} ({df_summary['Model'][i].split()[-1]})",
+            fontsize=9,
+            alpha=0.7,
+        )
+
+    plt.savefig("calibrated_time_vs_auc.png")
+    print("Efficiency plot saved as calibrated_time_vs_auc.png")
 
 
 if __name__ == "__main__":
